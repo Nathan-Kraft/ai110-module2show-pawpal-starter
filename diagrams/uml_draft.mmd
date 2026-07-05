@@ -1,0 +1,56 @@
+classDiagram
+    class Owner {
+        -id: str
+        -name: str
+        -preferences: dict
+        +addPet(pet: Pet) void
+        +getPets() List~Pet~
+    }
+
+    class Pet {
+        -id: str
+        -name: str
+        -species: str
+        -owner: Owner
+        +addTask(task: Task) void
+        +getTasks() List~Task~
+    }
+
+    class Task {
+        -id: str
+        -title: str
+        -durationMinutes: int
+        -priority: str
+        -preferredTime: str
+        -completed: bool
+        +markComplete() void
+    }
+
+    class Scheduler {
+        -tasks: List~Task~
+        +buildSchedule(tasks: List~Task~, constraints: dict) Schedule
+        +explainSchedule(schedule: Schedule) str
+        -prioritizeTasks(tasks: List~Task~) List~Task~
+        -resolveConflicts(tasks: List~Task~) List~Task~
+    }
+
+    class Schedule {
+        -date: str
+        -entries: List~ScheduleEntry~
+        +addEntry(entry: ScheduleEntry) void
+        +getEntries() List~ScheduleEntry~
+    }
+
+    class ScheduleEntry {
+        -task: Task
+        -startTime: str
+        -endTime: str
+        -reason: str
+    }
+
+    Owner "1" --> "many" Pet : owns
+    Pet "1" --> "many" Task : has
+    Scheduler "1" --> "many" Task : consumes
+    Scheduler --> Schedule : builds
+    Schedule "1" --> "many" ScheduleEntry : contains
+    ScheduleEntry --> Task : references
