@@ -38,14 +38,19 @@ In the task class I added pet_id so that there is a back-reference so a flat lis
 
 **a. Constraints and priorities**
 
-- What constraints does your scheduler consider (for example: time, priority, preferences)?
+- What constraints does your scheduler consider (for example: time, priority, preferences)? 
+My scheduler considers time, priority, date, available minutes, start time
 
 - How did you decide which constraints mattered most?
 
 **b. Tradeoffs**
 
 - Describe one tradeoff your scheduler makes.
+Conflict detection is decoupled from conflict resolution, and detection reports rather than repairs. find_conflicts runs against the raw requested times before _resolve_conflicts touches anything, purely to tell the caller "here's what had to be adjusted" it never rewrites the schedule itself. 
+(Might have this fixed by the end) **CHECK THIS BEFORE SUBMISSION**
 - Why is that tradeoff reasonable for this scenario?
+the auto-repair on detection alternative was rejected in favor of transparency: the owner can see what got bumped and why, rather than the software silently making unreviewed decisions about pet care timing. 
+An example of this is in the main.py demo output (the same time "vet checkup" conflict) that shows the tradeoff playing out. 
 
 ---
 
@@ -61,7 +66,9 @@ In the task class I added pet_id so that there is a back-reference so a flat lis
 
 - Describe one moment where you did not accept an AI suggestion as-is.
 
+
 - How did you evaluate or verify what the AI suggested?
+
 
 
 ---
