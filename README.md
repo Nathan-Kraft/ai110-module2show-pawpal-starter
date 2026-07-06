@@ -59,17 +59,29 @@ Schedule for 2026-07-05:
 
 ```bash
 # Run the full test suite:
-pytest
+python -m pytest ai110-module2show-pawpal-starter\tests\test_pawpal.py
+Test Descriptions
+Task validation & behavior — mark complete/incomplete, is_recurring, invalid frequency and non-positive duration raise errors, create_next_occurrence copies fields correctly.
+Pet — task add/remove/lookup, pet_id/duplicate-id validation, pending vs. completed splits, total duration.
+Owner — pet add/remove/lookup, flattening tasks across pets, pending/completed across pets, filter_tasks by completion status and/or pet name.
+
 
 # Run with coverage:
-pytest --cov
+python -m pytest ai110-module2show-pawpal-starter\tests\test_pawpal.py --cov
 ```
 
 Sample test output:
 
 ```
-# Paste your pytest output here
+platform win32 -- Python 3.13.13, pytest-9.1.1, pluggy-1.6.0
+plugins: anyio-4.14.0
+collected 52 items                                                                                                                
+
+ai110-module2show-pawpal-starter\tests\test_pawpal.py ....................................................                 [100%]
+
+======================================================= 53 passed in 0.08s =======================================================
 ```
+System Reliability: 5
 
 ## 📐 Smarter Scheduling
 

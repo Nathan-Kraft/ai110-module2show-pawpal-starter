@@ -24,7 +24,7 @@ def _advance_date(date_str: str, days: int) -> str:
     return (date.fromisoformat(date_str) + timedelta(days=days)).isoformat()
 
 
-# VALID_PRIORITIES = {"low", "medium", "high"}  # priority disabled for now, re-enable later
+VALID_PRIORITIES = {"low", "medium", "high"}
 VALID_FREQUENCIES = {"once", "daily", "weekly"}
 FREQUENCY_INTERVAL_DAYS = {"daily": 1, "weekly": 7}
 
@@ -43,10 +43,9 @@ class Task:
     due_date: str | None = None  # "YYYY-MM-DD"; None means always available to schedule
 
     def __post_init__(self) -> None:
-        """Validate frequency and duration after the dataclass fields are set."""
-        # Priority validation disabled for now — re-enable when priority-based scheduling returns.
-        # if self.priority not in VALID_PRIORITIES:
-        #     raise ValueError(f"priority must be one of {VALID_PRIORITIES}, got {self.priority!r}")
+        """Validate priority, frequency, and duration after the dataclass fields are set."""
+        if self.priority not in VALID_PRIORITIES:
+            raise ValueError(f"priority must be one of {VALID_PRIORITIES}, got {self.priority!r}")
         if self.frequency not in VALID_FREQUENCIES:
             raise ValueError(f"frequency must be one of {VALID_FREQUENCIES}, got {self.frequency!r}")
         if self.duration_minutes <= 0:
@@ -258,7 +257,7 @@ class Schedule:
         return next((entry for entry in self.entries if entry.task.id == task_id), None)
 
 
-# PRIORITY_RANK = {"high": 0, "medium": 1, "low": 2}  # priority disabled for now, re-enable later
+PRIORITY_RANK = {"high": 0, "medium": 1, "low": 2}
 
 
 class Scheduler:
@@ -352,10 +351,8 @@ class Scheduler:
     def _place(self, task: Task, next_open_minute: int) -> tuple[int, str]:
         """Return (start_minute, reason): a task's preferred time if it has one, else the next open slot."""
         if task.preferred_time is not None:
-            # reason = f"{task.priority} priority, honoring preferred time"
-            return _time_to_minutes(task.preferred_time), "honoring preferred time"
-        # reason = f"{task.priority} priority, next open slot"
-        return next_open_minute, "next open slot"
+            return _time_to_minutes(task.preferred_time), f"{task.priority} priority, honoring preferred time"
+        return next_open_minute, f"{task.priority} priority, next open slot"
 
     def explain_schedule(self, schedule: Schedule) -> str:
         """Return a human-readable summary of a schedule, including any skipped tasks."""
@@ -372,8 +369,7 @@ class Scheduler:
         if skipped:
             lines.append("Not scheduled (ran out of available time):")
             for task in skipped:
-                # lines.append(f"  - {task.title} ({task.priority} priority, {task.duration_minutes} min)")
-                lines.append(f"  - {task.title} ({task.duration_minutes} min)")
+                lines.append(f"  - {task.title} ({task.priority} priority, {task.duration_minutes} min)")
 
         conflicts = self.find_conflicts(entries)
         if conflicts:
@@ -418,12 +414,14 @@ class Scheduler:
         )
 
     def _prioritize_tasks(self, tasks: list[Task]) -> list[Task]:
-        """Order tasks for scheduling: fixed-time tasks first, then shortest first."""
+        """Order tasks for scheduling: highest priority first, then fixed-time tasks
+        chronologically, then shortest first."""
         return sorted(
             tasks,
             key=lambda task: (
-                # PRIORITY_RANK.get(task.priority, len(PRIORITY_RANK)),  # priority disabled for now
+                PRIORITY_RANK.get(task.priority, len(PRIORITY_RANK)),
                 0 if task.preferred_time is not None else 1,
+                _time_to_minutes(task.preferred_time) if task.preferred_time is not None else float("inf"),
                 task.duration_minutes,
             ),
         )
@@ -442,15 +440,13 @@ class Scheduler:
                 claimed_until = start + task.duration_minutes
                 claimant = task
                 continue
-            # This task's slot overlaps the previously claimed one. Priority-based
-            # tie-breaking disabled for now (re-enable this block when priority-based
-            # scheduling returns):
-            # loser = task if PRIORITY_RANK.get(task.priority, 99) > PRIORITY_RANK.get(claimant.priority, 99) else claimant
-            # if loser is claimant:
-            #     claimed_until = start + task.duration_minutes
-            #     claimant = task
-            # For now, the earlier-starting task wins and this one falls back to the next open slot.
-            loser = task
-            loser.preferred_time = None
+            # This task's slot overlaps the previously claimed one; the higher-priority
+            # task keeps its preferred time, and the other falls back to the next open slot.
+            if PRIORITY_RANK.get(task.priority, 99) < PRIORITY_RANK.get(claimant.priority, 99):
+                claimant.preferred_time = None
+                claimed_until = start + task.duration_minutes
+                claimant = task
+            else:
+                task.preferred_time = None
         return tasks
     

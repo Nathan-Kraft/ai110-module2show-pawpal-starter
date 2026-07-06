@@ -78,11 +78,13 @@ An example of this is in the main.py demo output (the same time "vet checkup" co
 **a. What you tested**
 
 - What behaviors did you test?
+
 - Why were these tests important?
 
 **b. Confidence**
 
 - How confident are you that your scheduler works correctly?
+
 - What edge cases would you test next if you had more time?
 
 ---
