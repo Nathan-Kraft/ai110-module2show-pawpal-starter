@@ -1,0 +1,89 @@
+classDiagram
+    class Owner {
+        -id: str
+        -name: str
+        -preferences: dict
+        -pets: List~Pet~
+        +addPet(pet: Pet) void
+        +removePet(petId: str) void
+        +getPet(petId: str) Pet
+        +getPets() List~Pet~
+        +getAllTasks() List~Task~
+        +getPendingTasks() List~Task~
+        +getCompletedTasks() List~Task~
+        +filterTasks(completed: bool, petName: str) List~Task~
+    }
+
+    class Pet {
+        -id: str
+        -name: str
+        -species: str
+        -tasks: List~Task~
+        +addTask(task: Task) void
+        +removeTask(taskId: str) void
+        +getTask(taskId: str) Task
+        +completeTask(taskId: str, completedOn: str) Task
+        +getTasks() List~Task~
+        +getPendingTasks() List~Task~
+        +getCompletedTasks() List~Task~
+        +totalDurationMinutes() int
+        -nextOccurrenceId(baseId: str) str
+    }
+
+    class Task {
+        -id: str
+        -title: str
+        -durationMinutes: int
+        -priority: str
+        -petId: str
+        -description: str
+        -frequency: str
+        -preferredTime: str
+        -completed: bool
+        -dueDate: str
+        +markComplete() void
+        +markIncomplete() void
+        +isRecurring() bool
+        +createNextOccurrence(newId: str, dueDate: str) Task
+    }
+
+    class Scheduler {
+        -tasks: List~Task~
+        -pendingTasks: List~Task~
+        -conflicts: List~tuple~
+        +buildSchedule(tasks: List~Task~, constraints: dict) Schedule
+        +explainSchedule(schedule: Schedule) str
+        +findConflicts(entries: List~ScheduleEntry~) List~tuple~
+        +sortByTime(tasks: List~Task~) List~Task~
+        +prioritizeTasks(tasks: List~Task~) List~Task~
+        -resolveConflicts(tasks: List~Task~, sortedFixedTasks: List~Task~) List~Task~
+        -sortedFixedTasks(tasks: List~Task~) List~Task~
+        -requestedEntries(sortedFixedTasks: List~Task~) List~ScheduleEntry~
+        -place(task: Task, nextOpenMinute: int) tuple
+    }
+
+    class Schedule {
+        -date: str
+        -entries: List~ScheduleEntry~
+        +addEntry(entry: ScheduleEntry) void
+        +getEntries() List~ScheduleEntry~
+        +totalScheduledMinutes() int
+        +findEntryForTask(taskId: str) ScheduleEntry
+    }
+
+    class ScheduleEntry {
+        -task: Task
+        -startTime: str
+        -endTime: str
+        -reason: str
+        +durationMinutes() int
+        +overlaps(other: ScheduleEntry) bool
+    }
+
+    Owner "1" --> "many" Pet : owns
+    Pet "1" --> "many" Task : has
+    Scheduler "1" --> "many" Task : consumes
+    Scheduler --> Schedule : builds
+    Schedule "1" --> "many" ScheduleEntry : contains
+    ScheduleEntry --> Task : references
+    Task ..> Pet : linked by pet_id string, not an object reference

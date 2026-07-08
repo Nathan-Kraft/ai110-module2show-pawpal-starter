@@ -56,6 +56,11 @@ def test_invalid_frequency_raises():
         Task(id="t1", title="Feed", duration_minutes=10, priority="low", pet_id="p1", frequency="monthly")
 
 
+def test_invalid_priority_raises():
+    with pytest.raises(ValueError):
+        Task(id="t1", title="Feed", duration_minutes=10, priority="urgent", pet_id="p1")
+
+
 @pytest.mark.parametrize("duration", [0, -5])
 def test_non_positive_duration_raises(duration):
     with pytest.raises(ValueError):
@@ -479,6 +484,76 @@ def test_build_schedule_orders_same_priority_fixed_tasks_chronologically():
 
     scheduled_ids = {entry.task.id for entry in schedule.get_entries()}
     assert scheduled_ids == {"t_earlier"}
+
+
+def test_prioritize_tasks_orders_high_before_medium_before_low():
+    tasks = [
+        Task(id="t_low", title="Low", duration_minutes=5, priority="low", pet_id="p1"),
+        Task(id="t_high", title="High", duration_minutes=50, priority="high", pet_id="p1"),
+        Task(id="t_medium", title="Medium", duration_minutes=20, priority="medium", pet_id="p1"),
+    ]
+    scheduler = Scheduler()
+
+    ordered = scheduler.prioritize_tasks(tasks)
+
+    assert [task.id for task in ordered] == ["t_high", "t_medium", "t_low"]
+
+
+def test_prioritize_tasks_breaks_priority_ties_by_duration():
+    tasks = [
+        Task(id="t_long", title="Long", duration_minutes=30, priority="medium", pet_id="p1"),
+        Task(id="t_short", title="Short", duration_minutes=10, priority="medium", pet_id="p1"),
+    ]
+    scheduler = Scheduler()
+
+    ordered = scheduler.prioritize_tasks(tasks)
+
+    assert [task.id for task in ordered] == ["t_short", "t_long"]
+
+
+def test_build_schedule_higher_priority_wins_overlapping_preferred_time():
+    tasks = [
+        Task(id="t_low", title="Low priority", duration_minutes=60, priority="low", pet_id="p1", preferred_time="09:00"),
+        Task(id="t_high", title="High priority", duration_minutes=30, priority="high", pet_id="p1", preferred_time="09:15"),
+    ]
+    scheduler = Scheduler()
+
+    schedule = scheduler.build_schedule(tasks, {"start_time": "08:00"})
+
+    high_entry = schedule.find_entry_for_task("t_high")
+    low_entry = schedule.find_entry_for_task("t_low")
+    assert high_entry.start_time == "09:15"
+    assert high_entry.reason == "honoring preferred time"
+    assert low_entry.reason == "next open slot"
+    assert not high_entry.overlaps(low_entry)
+
+
+def test_build_schedule_avoids_overlap_between_flexible_and_later_fixed_task():
+    tasks = [
+        Task(id="t_high_flex", title="High flex", duration_minutes=30, priority="high", pet_id="p1"),
+        Task(id="t_low_fixed", title="Low fixed", duration_minutes=20, priority="low", pet_id="p1", preferred_time="08:15"),
+    ]
+    scheduler = Scheduler()
+
+    schedule = scheduler.build_schedule(tasks, {"start_time": "08:00"})
+
+    flex_entry = schedule.find_entry_for_task("t_high_flex")
+    fixed_entry = schedule.find_entry_for_task("t_low_fixed")
+    assert not flex_entry.overlaps(fixed_entry)
+    assert fixed_entry.start_time == "08:30"
+    assert fixed_entry.reason == "next open slot (preferred time conflicted)"
+
+
+def test_prioritize_tasks_places_high_priority_before_low_priority_fixed_time():
+    tasks = [
+        Task(id="t_high", title="High", duration_minutes=10, priority="high", pet_id="p1"),
+        Task(id="t_low_fixed", title="Low fixed", duration_minutes=10, priority="low", pet_id="p1", preferred_time="09:00"),
+    ]
+    scheduler = Scheduler()
+
+    ordered = scheduler.prioritize_tasks(tasks)
+
+    assert [task.id for task in ordered] == ["t_high", "t_low_fixed"]
 
 
 def test_sort_by_time_puts_tasks_without_preferred_time_last():

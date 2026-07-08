@@ -102,3 +102,31 @@ conflicting_schedule.add_entry(ScheduleEntry(task=cat.get_task("t5"), start_time
 print("\nManually-built overlapping schedule (exercises the conflict warning)")
 print("=" * 40)
 print(scheduler.explain_schedule(conflicting_schedule))
+
+# A high-priority task with no preferred time claims a slot first (priority wins the
+# sort). A separate, lower-priority pet then requests a fixed time that falls inside
+# that just-claimed slot. _resolve_conflicts only settles fixed-vs-fixed collisions, so
+# without _place checking already-placed intervals this would double-book the owner.
+dog.add_task(
+    Task(
+        id="t6",
+        title="Training session",
+        duration_minutes=30,
+        priority="high",
+        pet_id=dog.id,
+    )
+)
+cat.add_task(
+    Task(
+        id="t7",
+        title="Nail trim",
+        duration_minutes=20,
+        priority="low",
+        pet_id=cat.id,
+        preferred_time="08:15",  # falls inside whatever slot "Training session" claims
+    )
+)
+flexible_vs_fixed_schedule = scheduler.build_schedule([dog.get_task("t6"), cat.get_task("t7")], {"start_time": "08:00"})
+print("\nHigh-priority flexible task vs. later lower-priority fixed task (no overlap)")
+print("=" * 40)
+print(scheduler.explain_schedule(flexible_vs_fixed_schedule))

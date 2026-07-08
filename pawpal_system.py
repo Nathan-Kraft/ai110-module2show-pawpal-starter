@@ -294,18 +294,19 @@ class Scheduler:
         self.conflicts = self.find_conflicts(self._requested_entries(sorted_fixed_tasks))
 
         resolved = self._resolve_conflicts(pending, sorted_fixed_tasks)
-        prioritized = self._prioritize_tasks(resolved)
+        prioritized = self.prioritize_tasks(resolved)
 
         available_minutes = constraints.get("available_minutes")
         next_open_minute = _time_to_minutes(constraints.get("start_time", "08:00"))
         used_minutes = 0
 
         schedule = Schedule(date=date)
+        placed_intervals: list[tuple[int, int]] = []
         for task in prioritized:
             if available_minutes is not None and used_minutes + task.duration_minutes > available_minutes:
                 continue
 
-            entry_start, reason = self._place(task, next_open_minute)
+            entry_start, reason = self._place(task, next_open_minute, placed_intervals)
             entry_end = entry_start + task.duration_minutes
             schedule.add_entry(
                 ScheduleEntry(
@@ -315,6 +316,7 @@ class Scheduler:
                     reason=reason,
                 )
             )
+            placed_intervals.append((entry_start, entry_end))
             next_open_minute = max(next_open_minute, entry_end)
             used_minutes += task.duration_minutes
 
@@ -348,11 +350,24 @@ class Scheduler:
             for task in sorted_fixed_tasks
         ]
 
-    def _place(self, task: Task, next_open_minute: int) -> tuple[int, str]:
-        """Return (start_minute, reason): a task's preferred time if it has one, else the next open slot."""
+    def _place(
+        self, task: Task, next_open_minute: int, placed_intervals: list[tuple[int, int]]
+    ) -> tuple[int, str]:
+        """Return (start_minute, reason) for a task, given the intervals already placed so far.
+
+        A task's preferred time is honored only if it doesn't overlap an already-placed
+        entry (e.g. a higher-priority flexible task claimed that slot earlier this same
+        build_schedule pass); `_resolve_conflicts` only settles fixed-vs-fixed collisions,
+        so this is what prevents a fixed-vs-already-placed overlap from reaching the
+        final schedule. Otherwise the task falls back to the next open slot.
+        """
         if task.preferred_time is not None:
-            return _time_to_minutes(task.preferred_time), f"{task.priority} priority, honoring preferred time"
-        return next_open_minute, f"{task.priority} priority, next open slot"
+            start = _time_to_minutes(task.preferred_time)
+            end = start + task.duration_minutes
+            if not any(start < placed_end and placed_start < end for placed_start, placed_end in placed_intervals):
+                return start, "honoring preferred time"
+            return next_open_minute, "next open slot (preferred time conflicted)"
+        return next_open_minute, "next open slot"
 
     def explain_schedule(self, schedule: Schedule) -> str:
         """Return a human-readable summary of a schedule, including any skipped tasks."""
@@ -362,7 +377,7 @@ class Scheduler:
         if not entries:
             lines.append("  (no tasks scheduled)")
         for entry in entries:
-            lines.append(f"  {entry}")
+            lines.append(f"  {entry} ({entry.task.priority} priority)")
 
         scheduled_ids = {entry.task.id for entry in entries}
         skipped = [task for task in self.pending_tasks if task.id not in scheduled_ids]
@@ -401,8 +416,9 @@ class Scheduler:
             start = _time_to_minutes(entry.start_time)
             open_entries = [other for other in open_entries if _time_to_minutes(other.end_time) > start]
             for other in open_entries:
-                same_pet = other.task.pet_id == entry.task.pet_id
-                conflicts.append((other, entry, same_pet))
+                if other.overlaps(entry):
+                    same_pet = other.task.pet_id == entry.task.pet_id
+                    conflicts.append((other, entry, same_pet))
             open_entries.append(entry)
         return conflicts
 
@@ -413,7 +429,7 @@ class Scheduler:
             key=lambda task: _time_to_minutes(task.preferred_time) if task.preferred_time is not None else float("inf"),
         )
 
-    def _prioritize_tasks(self, tasks: list[Task]) -> list[Task]:
+    def prioritize_tasks(self, tasks: list[Task]) -> list[Task]:
         """Order tasks for scheduling: highest priority first, then fixed-time tasks
         chronologically, then shortest first."""
         return sorted(
